@@ -5,8 +5,10 @@ import xgboost as xgb
 import joblib
 import matplotlib.pyplot as plt
 import shap
+from sklearn.metrics import (ConfusionMatrixDisplay, confusion_matrix,
+                             precision_recall_curve, average_precision_score)
 
-st.set_page_config(page_title="Mule Account Detection", page_icon="",
+st.set_page_config(page_title="GHOST SQUADRON BOI", page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
 OUTPUT_DIR = 'model/'
@@ -22,6 +24,16 @@ MONTH_MAP = {
 }
 F3889_TYPE_MAP = {'G':0,'L':1}
 
+st.markdown("""
+<style>
+[data-testid="stMetricValue"] { font-size: 1.8rem; }
+[data-testid="stMetricDelta"] { font-size: 0.9rem; }
+.stTabs [data-baseweb="tab-list"] { gap: 2px; }
+.stTabs [data-baseweb="tab"] { padding: 8px 24px; font-size: 0.95rem; }
+div[data-testid="stExpander"] div[role="button"] p { font-size: 1rem; }
+</style>
+""", unsafe_allow_html=True)
+
 
 @st.cache_resource
 def load_model():
@@ -31,7 +43,8 @@ def load_model():
     features = joblib.load(f'{OUTPUT_DIR}selected_features.pkl')
     explainer = joblib.load(f'{OUTPUT_DIR}shap_explainer.pkl')
     test_eval = joblib.load(f'{OUTPUT_DIR}test_eval.pkl')
-    return model, threshold, features, explainer, test_eval
+    shap_sample = joblib.load(f'{OUTPUT_DIR}shap_sample.pkl')
+    return model, threshold, features, explainer, test_eval, shap_sample
 
 
 def preprocess_batch(df):
@@ -70,9 +83,31 @@ def shap_waterfall(shap_val, instance, feature_names, expected_val):
     return fig
 
 
+def plot_cv_chart():
+    cv = pd.DataFrame({
+        'Fold': ['1', '2', '3', '4', '5'],
+        'Recall': [0.923, 1.000, 0.923, 1.000, 1.000],
+        'Precision': [1.000, 0.929, 0.923, 1.000, 0.867],
+        'F2': [0.938, 0.985, 0.923, 1.000, 0.970],
+    }).melt(id_vars='Fold', var_name='Metric', value_name='Score')
+    fig, ax = plt.subplots(figsize=(9, 4))
+    colors = {'Recall': '#2196F3', 'Precision': '#4CAF50', 'F2': '#FF9800'}
+    for metric in ['Recall', 'Precision', 'F2']:
+        data = cv[cv['Metric'] == metric]
+        ax.plot(data['Fold'], data['Score'], marker='o', label=metric,
+                color=colors[metric], linewidth=2.5, markersize=8)
+    ax.set_ylim(0.8, 1.05)
+    ax.set_ylabel('Score')
+    ax.set_title('5-Fold Cross-Validation', fontsize=14)
+    ax.legend(loc='lower right')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    return fig
+
+
 def main():
     try:
-        model, threshold, selected_features, explainer, test_eval = load_model()
+        model, threshold, selected_features, explainer, test_eval, shap_sample = load_model()
     except Exception as e:
         st.error(f"Failed to load model: {e}")
         st.info("Run `python3 2_train.py` first to train the model.")
@@ -80,25 +115,25 @@ def main():
 
     with st.sidebar:
         st.markdown("## GHOST SQUADRON BOI")
-        st.markdown("Mule Account Detection System")
+        st.markdown("*Mule Account Detection*")
         st.divider()
         st.markdown("### Performance")
-        st.markdown(f"**Recall:** {test_eval['recall']:.0%}")
-        st.markdown(f"**Precision:** {test_eval['precision']:.0%}")
-        st.markdown(f"**F2 Score:** {test_eval['f2']:.3f}")
-        st.markdown(f"**Threshold:** {threshold:.3f}")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Recall", f"{test_eval['recall']:.0%}")
+        m2.metric("Precision", f"{test_eval['precision']:.0%}")
+        m3.metric("F2", f"{test_eval['f2']:.3f}")
         st.divider()
-        st.markdown("### Top Signals")
-        st.markdown("- F3912")
-        st.markdown("- F2230_num (month)")
-        st.markdown("- F3898")
-        st.markdown("- F2030")
-        st.markdown("- F2956")
+        st.markdown("### Top 5 Signals")
+        tops = ['F3912', 'F2230_num', 'F3898', 'F2030', 'F2956']
+        for i, t in enumerate(tops, 1):
+            st.markdown(f"**{i}.** `{t}`")
+        st.divider()
+        st.caption("Threshold: `{:.4f}` | {} features".format(threshold, len(selected_features)))
 
-    tab1, tab2 = st.tabs([" Batch Predict", " Single Predict"])
+    tab1, tab2, tab3 = st.tabs([" Batch Predict", " Single Predict", " Model Insights"])
 
     with tab1:
-        st.subheader("Batch Prediction")
+        st.subheader("Upload & Detect")
         uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
         if uploaded_file is not None:
             with st.spinner("Processing..."):
@@ -116,16 +151,19 @@ def main():
                 out['prediction'] = ['SUSPICIOUS' if p else 'LEGITIMATE' for p in preds]
                 out['probability'] = probas.round(4)
 
-                st.success(f"Processed {len(out)} accounts | "
-                           f"{int(preds.sum())} flagged suspicious")
+                total = len(out)
+                flagged = int(preds.sum())
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Accounts", f"{total:,}")
+                c2.metric("Flagged Suspicious", f"{flagged:,}",
+                          delta=f"{flagged/total*100:.1f}%")
+                c3.metric("Clean Accounts", f"{total - flagged:,}")
 
                 st.dataframe(out[['risk_score', 'prediction', 'probability']],
                              use_container_width=True, hide_index=True)
+                st.download_button("Download Results", out.to_csv(index=False),
+                                   "predictions.csv", "text/csv")
 
-                csv = out.to_csv(index=False)
-                st.download_button("Download Results", csv, "predictions.csv", "text/csv")
-
-                st.subheader("Risk Score Distribution")
                 fig, ax = plt.subplots(figsize=(8, 3))
                 ax.hist(scores[preds == 0], bins=20, alpha=0.6,
                         label='Legitimate', color='#4CAF50', edgecolor='black')
@@ -136,12 +174,12 @@ def main():
                 ax.legend()
                 st.pyplot(fig)
 
-                if preds.sum() > 0:
-                    st.subheader("Why These Accounts Were Flagged")
+                if flagged > 0:
+                    st.subheader("Why Were These Flagged?")
                     flagged_X = X[preds == 1]
                     with st.spinner("Computing explanations..."):
                         sv = explainer.shap_values(flagged_X)
-                    idx = st.selectbox("Select a flagged account:",
+                    idx = st.selectbox("Select flagged account:",
                                        range(len(flagged_X)),
                                        format_func=lambda i: f"Account #{i+1}")
                     st.pyplot(shap_waterfall(sv[idx], flagged_X[idx],
@@ -149,7 +187,7 @@ def main():
                                               explainer.expected_value))
 
     with tab2:
-        st.subheader("Single Account Prediction")
+        st.subheader("Single Account Check")
         col1, col2 = st.columns(2)
         row = {}
         half = len(selected_features) // 2
@@ -163,7 +201,13 @@ def main():
         if st.button("Predict", type="primary"):
             clean = {}
             for k, v in row.items():
-                clean[k] = 0.0 if v == "" or v is None else float(v) if v.replace('.','',1).replace('-','',1).isdigit() else 0.0
+                if v == "" or v is None:
+                    clean[k] = 0.0
+                else:
+                    try:
+                        clean[k] = float(v)
+                    except ValueError:
+                        clean[k] = 0.0
             X = np.array([clean[f] for f in selected_features]).reshape(1, -1)
             proba = model.predict_proba(X)[0, 1]
             pred = int(proba >= threshold)
@@ -173,17 +217,55 @@ def main():
             c1.metric("Risk Score", f"{score}/100",
                       delta="HIGH" if pred else "LOW",
                       delta_color="inverse" if pred else "normal")
-            c2.metric("Prediction", "SUSPICIOUS" if pred else "LEGITIMATE")
+            c2.metric("Decision", "SUSPICIOUS" if pred else "LEGITIMATE")
             c3.metric("Confidence", f"{proba:.2%}")
 
             if pred:
                 sv = explainer.shap_values(X)[0]
-                st.subheader("Top Contributing Factors")
+                st.markdown("#### Top Contributing Factors")
                 contrib = sorted(zip(selected_features, sv),
                                  key=lambda x: -abs(x[1]))
                 for feat, val in contrib[:5]:
-                    arrow = " ↑" if val > 0 else " ↓"
-                    st.markdown(f"- **{feat}**: {val:+.4f}{arrow}")
+                    arrow = " increases" if val > 0 else " decreases"
+                    st.markdown(f"- `{feat}` {val:+.4f} ({arrow.strip()} risk)")
+
+    with tab3:
+        st.subheader("Model Performance")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Recall", f"{test_eval['recall']:.0%}")
+        c2.metric("Precision", f"{test_eval['precision']:.0%}")
+        c3.metric("F2 Score", f"{test_eval['f2']:.3f}")
+        c4.metric("PR-AUC", f"{test_eval['pr_auc']:.3f}")
+
+        st.markdown(f"**Threshold:** `{threshold:.4f}`  ·  **Features:** `{len(selected_features)}`")
+
+        st.markdown("#### Confusion Matrix")
+        cm = confusion_matrix(test_eval['y_test'], test_eval['y_pred'])
+        fig, ax = plt.subplots(figsize=(4.5, 3.5))
+        ConfusionMatrixDisplay(cm, display_labels=['Legitimate', 'Suspicious']).plot(
+            cmap='Blues', ax=ax, values_format='d', colorbar=False)
+        ax.set_title('')
+        st.pyplot(fig)
+
+        st.markdown("#### Cross-Validation (5-Fold)")
+        st.pyplot(plot_cv_chart())
+        cv_data = pd.DataFrame({
+            'Fold': ['1', '2', '3', '4', '5'],
+            'Recall': [0.923, 1.000, 0.923, 1.000, 1.000],
+            'Precision': [1.000, 0.929, 0.923, 1.000, 0.867],
+            'F2': [0.938, 0.985, 0.923, 1.000, 0.970],
+            'PR-AUC': [0.944, 0.975, 0.975, 1.000, 0.982],
+        }).set_index('Fold')
+        st.dataframe(cv_data, use_container_width=True)
+
+        st.markdown("#### Feature Importance (SHAP)")
+        with st.spinner("Rendering..."):
+            sv = explainer.shap_values(shap_sample)
+            fig, ax = plt.subplots(figsize=(9, 5))
+            shap.summary_plot(sv, shap_sample, feature_names=selected_features,
+                              plot_type='bar', show=False, max_display=15)
+            plt.tight_layout()
+            st.pyplot(fig)
 
 
 if __name__ == '__main__':
