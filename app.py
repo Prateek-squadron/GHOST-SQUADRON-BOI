@@ -4,10 +4,7 @@ import numpy as np
 import xgboost as xgb
 import joblib
 import matplotlib.pyplot as plt
-import seaborn as sns
 import shap
-from sklearn.metrics import (ConfusionMatrixDisplay, confusion_matrix,
-                             precision_recall_curve, average_precision_score)
 
 st.set_page_config(page_title="Mule Account Detection", page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
@@ -16,7 +13,6 @@ OUTPUT_DIR = 'model/'
 CAT_COLS = ['F3886', 'F3890', 'F3891', 'F3892', 'F3893']
 DATE_COL = 'F3888'
 MONTH_COL = 'F2230'
-TARGET = 'F3924'
 MONTH_MAP = {
     'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,
     'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12,
@@ -25,7 +21,6 @@ MONTH_MAP = {
     'Nov25':11,'Dec25':12,
 }
 F3889_TYPE_MAP = {'G':0,'L':1}
-sns.set_style('whitegrid')
 
 
 @st.cache_resource
@@ -43,8 +38,8 @@ def preprocess_batch(df):
     df = df.copy()
     if 'Unnamed: 0' in df.columns:
         df = df.drop(columns=['Unnamed: 0'])
-    if TARGET in df.columns:
-        df = df.drop(columns=[TARGET])
+    if 'F3924' in df.columns:
+        df = df.drop(columns=['F3924'])
     if DATE_COL in df.columns:
         dates = pd.to_datetime(df[DATE_COL], dayfirst=True, errors='coerce')
         df[f'{DATE_COL}_year'] = dates.dt.year
@@ -65,82 +60,6 @@ def preprocess_batch(df):
     return df
 
 
-def plot_confusion_matrix(y_test, y_pred):
-    cm = confusion_matrix(y_test, y_pred)
-    fig, ax = plt.subplots(figsize=(5, 4))
-    disp = ConfusionMatrixDisplay(cm, display_labels=['Legitimate', 'Suspicious'])
-    disp.plot(cmap='Blues', ax=ax, values_format='d', colorbar=False)
-    ax.set_title('Confusion Matrix (Test Set)', fontsize=13)
-    plt.tight_layout()
-    return fig
-
-
-def plot_pr_curve(y_test, y_prob):
-    precisions, recalls, _ = precision_recall_curve(y_test, y_prob)
-    ap = average_precision_score(y_test, y_prob)
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(recalls, precisions, color='#2196F3', linewidth=2.5, label=f'PR-AUC = {ap:.3f}')
-    ax.fill_between(recalls, precisions, alpha=0.15, color='#2196F3')
-    ax.set_xlabel('Recall', fontsize=12)
-    ax.set_ylabel('Precision', fontsize=12)
-    ax.set_title('Precision-Recall Curve', fontsize=13)
-    ax.legend(loc='lower left')
-    ax.set_xlim([0, 1.05])
-    ax.set_ylim([0, 1.05])
-    plt.tight_layout()
-    return fig
-
-
-def plot_shap_summary(explainer, X_sample, feature_names):
-    shap_values = explainer.shap_values(X_sample)
-    fig, ax = plt.subplots(figsize=(9, 6))
-    shap.summary_plot(shap_values, X_sample, feature_names=feature_names,
-                      show=False, max_display=15, alpha=0.7)
-    plt.tight_layout()
-    return fig
-
-
-def plot_shap_bar(explainer, X_sample, feature_names):
-    shap_values = explainer.shap_values(X_sample)
-    fig, ax = plt.subplots(figsize=(9, 6))
-    shap.summary_plot(shap_values, X_sample, feature_names=feature_names,
-                      plot_type='bar', show=False, max_display=15)
-    plt.tight_layout()
-    return fig
-
-
-def plot_cv_metrics():
-    cv_data = pd.DataFrame({
-        'Fold': ['1', '2', '3', '4', '5'],
-        'Recall': [0.923, 1.000, 0.923, 1.000, 1.000],
-        'Precision': [1.000, 0.929, 0.923, 1.000, 0.867],
-        'F2': [0.938, 0.985, 0.923, 1.000, 0.970],
-    }).melt(id_vars='Fold', var_name='Metric', value_name='Score')
-    fig, ax = plt.subplots(figsize=(8, 4))
-    sns.barplot(data=cv_data, x='Fold', y='Score', hue='Metric',
-                palette='muted', edgecolor='black', ax=ax)
-    ax.set_ylim(0.8, 1.05)
-    ax.set_title('5-Fold Cross-Validation Performance', fontsize=13)
-    ax.legend(loc='lower right')
-    plt.tight_layout()
-    return fig
-
-
-def plot_risk_distribution(y_test, y_prob):
-    scores = (y_prob * 100).astype(int)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(scores[y_test == 0], bins=20, alpha=0.6, label='Legitimate',
-            color='#4CAF50', edgecolor='black')
-    ax.hist(scores[y_test == 1], bins=20, alpha=0.85, label='Suspicious',
-            color='#F44336', edgecolor='black')
-    ax.set_xlabel('Risk Score (0–100)')
-    ax.set_ylabel('Count')
-    ax.set_title('Risk Score Distribution by Actual Class', fontsize=13)
-    ax.legend()
-    plt.tight_layout()
-    return fig
-
-
 def shap_waterfall(shap_val, instance, feature_names, expected_val):
     fig, ax = plt.subplots(figsize=(9, 5))
     shap.plots.waterfall(shap.Explanation(
@@ -152,9 +71,6 @@ def shap_waterfall(shap_val, instance, feature_names, expected_val):
 
 
 def main():
-    st.title("Mule Account Detection System")
-    st.markdown("AI/ML-powered classification of suspicious mule accounts using XGBoost")
-
     try:
         model, threshold, selected_features, explainer, test_eval = load_model()
     except Exception as e:
@@ -162,7 +78,24 @@ def main():
         st.info("Run `python3 2_train.py` first to train the model.")
         return
 
-    tab1, tab2, tab3 = st.tabs([" Batch Predict", " Single Predict", " Model Insights"])
+    with st.sidebar:
+        st.markdown("## GHOST SQUADRON BOI")
+        st.markdown("Mule Account Detection System")
+        st.divider()
+        st.markdown("### Performance")
+        st.markdown(f"**Recall:** {test_eval['recall']:.0%}")
+        st.markdown(f"**Precision:** {test_eval['precision']:.0%}")
+        st.markdown(f"**F2 Score:** {test_eval['f2']:.3f}")
+        st.markdown(f"**Threshold:** {threshold:.3f}")
+        st.divider()
+        st.markdown("### Top Signals")
+        st.markdown("- F3912")
+        st.markdown("- F2230_num (month)")
+        st.markdown("- F3898")
+        st.markdown("- F2030")
+        st.markdown("- F2956")
+
+    tab1, tab2 = st.tabs([" Batch Predict", " Single Predict"])
 
     with tab1:
         st.subheader("Batch Prediction")
@@ -183,39 +116,37 @@ def main():
                 out['prediction'] = ['SUSPICIOUS' if p else 'LEGITIMATE' for p in preds]
                 out['probability'] = probas.round(4)
 
-                st.success(f"Processed {len(out)} accounts")
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Total Accounts", len(out))
-                c2.metric("Flagged Suspicious", int(preds.sum()),
-                          delta=f"{preds.mean()*100:.1f}%")
-                c3.metric("Threshold", f"{threshold:.3f}")
+                st.success(f"Processed {len(out)} accounts | "
+                           f"{int(preds.sum())} flagged suspicious")
 
                 st.dataframe(out[['risk_score', 'prediction', 'probability']],
                              use_container_width=True, hide_index=True)
+
                 csv = out.to_csv(index=False)
-                st.download_button("Download Predictions", csv, "predictions.csv", "text/csv")
+                st.download_button("Download Results", csv, "predictions.csv", "text/csv")
 
                 st.subheader("Risk Score Distribution")
-                fig, ax = plt.subplots(figsize=(8, 4))
+                fig, ax = plt.subplots(figsize=(8, 3))
                 ax.hist(scores[preds == 0], bins=20, alpha=0.6,
-                        label='LEGITIMATE', color='#4CAF50', edgecolor='black')
+                        label='Legitimate', color='#4CAF50', edgecolor='black')
                 ax.hist(scores[preds == 1], bins=20, alpha=0.85,
-                        label='SUSPICIOUS', color='#F44336', edgecolor='black')
-                ax.set_xlabel('Risk Score (0–100)')
+                        label='Suspicious', color='#F44336', edgecolor='black')
+                ax.set_xlabel('Risk Score')
                 ax.set_ylabel('Count')
-                ax.set_title('Predicted Risk Scores')
                 ax.legend()
                 st.pyplot(fig)
 
                 if preds.sum() > 0:
-                    st.subheader("SHAP Explanations for Flagged Accounts")
+                    st.subheader("Why These Accounts Were Flagged")
                     flagged_X = X[preds == 1]
-                    with st.spinner("Computing SHAP..."):
+                    with st.spinner("Computing explanations..."):
                         sv = explainer.shap_values(flagged_X)
-                    idx = st.selectbox("Select flagged account:", range(len(flagged_X)),
+                    idx = st.selectbox("Select a flagged account:",
+                                       range(len(flagged_X)),
                                        format_func=lambda i: f"Account #{i+1}")
                     st.pyplot(shap_waterfall(sv[idx], flagged_X[idx],
-                                              selected_features, explainer.expected_value))
+                                              selected_features,
+                                              explainer.expected_value))
 
     with tab2:
         st.subheader("Single Account Prediction")
@@ -232,19 +163,12 @@ def main():
         if st.button("Predict", type="primary"):
             clean = {}
             for k, v in row.items():
-                if v == "" or v is None:
-                    clean[k] = 0.0
-                else:
-                    try:
-                        clean[k] = float(v)
-                    except ValueError:
-                        clean[k] = 0.0
+                clean[k] = 0.0 if v == "" or v is None else float(v) if v.replace('.','',1).replace('-','',1).isdigit() else 0.0
             X = np.array([clean[f] for f in selected_features]).reshape(1, -1)
             proba = model.predict_proba(X)[0, 1]
             pred = int(proba >= threshold)
             score = int(round(proba * 100))
 
-            st.markdown("---")
             c1, c2, c3 = st.columns(3)
             c1.metric("Risk Score", f"{score}/100",
                       delta="HIGH" if pred else "LOW",
@@ -254,58 +178,12 @@ def main():
 
             if pred:
                 sv = explainer.shap_values(X)[0]
-                st.subheader("Top Contributing Features")
-                contrib = sorted(zip(selected_features, sv), key=lambda x: -abs(x[1]))
+                st.subheader("Top Contributing Factors")
+                contrib = sorted(zip(selected_features, sv),
+                                 key=lambda x: -abs(x[1]))
                 for feat, val in contrib[:5]:
-                    icon = "" if val > 0 else ""
-                    st.markdown(f"- **{feat}**: {val:+.4f} {icon}")
-
-    with tab3:
-        st.subheader("Model Performance")
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Recall", f"{test_eval['recall']:.3f}")
-        c2.metric("Precision", f"{test_eval['precision']:.3f}")
-        c3.metric("F2 Score", f"{test_eval['f2']:.3f}")
-        c4.metric("PR-AUC", f"{test_eval['pr_auc']:.3f}")
-
-        st.markdown(f"**Threshold:** `{threshold:.4f}` | **Features:** `{len(selected_features)}`")
-
-        g1, g2 = st.columns(2)
-        with g1:
-            st.pyplot(plot_confusion_matrix(test_eval['y_test'], test_eval['y_pred']))
-        with g2:
-            st.pyplot(plot_pr_curve(test_eval['y_test'], test_eval['y_prob']))
-
-        st.pyplot(plot_risk_distribution(test_eval['y_test'], test_eval['y_prob']))
-
-        st.subheader("Feature Importance")
-        g3, g4 = st.columns(2)
-        with g3:
-            with st.spinner("Computing SHAP summary..."):
-                try:
-                    X_samp = joblib.load(f'{OUTPUT_DIR}shap_sample.pkl')
-                except Exception:
-                    X_samp = None
-                if X_samp is not None and len(X_samp) > 0:
-                    st.pyplot(plot_shap_summary(explainer, X_samp, selected_features))
-                else:
-                    st.warning("SHAP sample not available")
-        with g4:
-            with st.spinner("Computing SHAP bar chart..."):
-                if X_samp is not None and len(X_samp) > 0:
-                    st.pyplot(plot_shap_bar(explainer, X_samp, selected_features))
-
-        st.subheader("Cross-Validation")
-        st.pyplot(plot_cv_metrics())
-        cv_data = pd.DataFrame({
-            'Fold': ['1', '2', '3', '4', '5'],
-            'Recall': [0.923, 1.000, 0.923, 1.000, 1.000],
-            'Precision': [1.000, 0.929, 0.923, 1.000, 0.867],
-            'F2': [0.938, 0.985, 0.923, 1.000, 0.970],
-            'PR-AUC': [0.944, 0.975, 0.975, 1.000, 0.982],
-        }).set_index('Fold')
-        st.dataframe(cv_data, use_container_width=True)
+                    arrow = " ↑" if val > 0 else " ↓"
+                    st.markdown(f"- **{feat}**: {val:+.4f}{arrow}")
 
 
 if __name__ == '__main__':
