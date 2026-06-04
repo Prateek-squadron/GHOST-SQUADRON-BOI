@@ -1,0 +1,11 @@
+pandas>=1.5
+numpy>=1.24
+scikit-learn>=1.2
+xgboost>=1.7
+shap>=0.41
+joblib>=1.2
+matplotlib>=3.5
+seaborn>=0.12
+streamlit>=1.25
+notebook>=6.5
+ipykernel>=6.15

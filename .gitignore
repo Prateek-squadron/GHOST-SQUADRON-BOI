@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+predictions_output.csv
+model/preprocessed_data.pkl
+.DS_Store
+*.swp
+*.csv
+*.pdf
