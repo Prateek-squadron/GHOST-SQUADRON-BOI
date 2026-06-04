@@ -199,6 +199,9 @@ def main():
         joblib.dump(explainer, f'{OUTPUT_DIR}shap_explainer.pkl')
     if test_eval is not None:
         joblib.dump(test_eval, f'{OUTPUT_DIR}test_eval.pkl')
+
+    shap_sample = X_arr[np.random.RandomState(42).choice(len(X_arr), size=min(200, len(X_arr)), replace=False)]
+    joblib.dump(shap_sample, f'{OUTPUT_DIR}shap_sample.pkl')
     print(f'\nModel & artifacts saved to {OUTPUT_DIR}')
 
 

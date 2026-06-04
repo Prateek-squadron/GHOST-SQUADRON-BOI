@@ -282,20 +282,19 @@ def main():
         st.subheader("Feature Importance")
         g3, g4 = st.columns(2)
         with g3:
-            sample_n = min(500, len(test_eval['y_test']))
-            X_sample = test_eval['y_prob'][:sample_n].reshape(-1, 1)
-            dummy = np.random.seed(42)
-            existing_data_path = f'{OUTPUT_DIR}preprocessed_data.pkl'
-            preproc = joblib.load(existing_data_path)
-            X_full = preproc[0]
-            sample_idx = np.random.RandomState(42).choice(len(X_full),
-                          size=min(200, len(X_full)), replace=False)
-            X_samp = X_full[sample_idx]
             with st.spinner("Computing SHAP summary..."):
-                st.pyplot(plot_shap_summary(explainer, X_samp, selected_features))
+                try:
+                    X_samp = joblib.load(f'{OUTPUT_DIR}shap_sample.pkl')
+                except Exception:
+                    X_samp = None
+                if X_samp is not None and len(X_samp) > 0:
+                    st.pyplot(plot_shap_summary(explainer, X_samp, selected_features))
+                else:
+                    st.warning("SHAP sample not available")
         with g4:
             with st.spinner("Computing SHAP bar chart..."):
-                st.pyplot(plot_shap_bar(explainer, X_samp, selected_features))
+                if X_samp is not None and len(X_samp) > 0:
+                    st.pyplot(plot_shap_bar(explainer, X_samp, selected_features))
 
         st.subheader("Cross-Validation")
         st.pyplot(plot_cv_metrics())
