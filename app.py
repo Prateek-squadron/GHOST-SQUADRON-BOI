@@ -8,7 +8,7 @@ import shap
 from sklearn.metrics import (ConfusionMatrixDisplay, confusion_matrix,
                              precision_recall_curve, average_precision_score)
 
-st.set_page_config(page_title="GHOST SQUADRON BOI", page_icon="",
+st.set_page_config(page_title="GHOST — Mule Account Detection", page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
 OUTPUT_DIR = 'model/'
@@ -114,8 +114,9 @@ def main():
         return
 
     with st.sidebar:
-        st.markdown("## GHOST SQUADRON BOI")
-        st.markdown("*Mule Account Detection*")
+        st.markdown("## GHOST")
+        st.markdown("*Guarding Hostile Obfuscated Suspicious Transactions*")
+        st.markdown("Mule Account Detection")
         st.divider()
         st.markdown("### Performance")
         m1, m2, m3 = st.columns(3)
