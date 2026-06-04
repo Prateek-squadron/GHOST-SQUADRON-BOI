@@ -14,7 +14,7 @@
   <a href="https://streamlit.io/"><img src="https://img.shields.io/badge/Streamlit-1.28-red?logo=streamlit&logoColor=white" alt="Streamlit"></a>
   <a href="https://shap.readthedocs.io/"><img src="https://img.shields.io/badge/SHAP-0.45-green" alt="SHAP"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License"></a>
-  <a href="https://ghost-squadron-submittion.streamlit.app/"><img src="https://static.streamlit.io/badges/streamlit_badge_black_white.svg" alt="Streamlit App"></a>
+  <a href="https://ghost-squadron-submittion.streamlit.app/"><img src="https://img.shields.io/badge/Live_Demo-ghost--squadron--submittion.streamlit.app-FF4B4B?style=flat-square&logo=streamlit&logoColor=white" alt="Live Demo"></a>
 </p>
 
 ---
@@ -22,11 +22,11 @@
 ##   Quick Stats
 
 <p align="center">
-  <img src="https://img.shields.io/badge/📊_Recall-97%25-success?style=for-the-badge">
-  <img src="https://img.shields.io/badge/🎯_Precision-94%25-success?style=for-the-badge">
-  <img src="https://img.shields.io/badge/📈_PR--AUC-0.975-success?style=for-the-badge">
-  <img src="https://img.shields.io/badge/🧠_Features-100-important?style=for-the-badge">
-  <img src="https://img.shields.io/badge/🚀_Live_Demo-Streamlit_Coud-important?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Recall-97%25-success?style=for-the-badge&logo=checkmarx&logoColor=white">
+  <img src="https://img.shields.io/badge/Precision-94%25-success?style=for-the-badge&logo=checkmarx&logoColor=white">
+  <img src="https://img.shields.io/badge/PR--AUC-0.975-success?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Features-100-important?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Test_Set-16_flagged_0_missed-important?style=for-the-badge">
 </p>
 
 ---
